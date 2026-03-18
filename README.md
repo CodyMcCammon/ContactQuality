@@ -13,6 +13,9 @@ Locating bat-tracking and pitch-tracking data. Understanding how to use it.
 
 Generating EOM (equaions of motion) for MOI (moment of impact). 
 
+## UPDATE
+Datasets obtained for 2025. Model creation can proceed rapidly now.
+
 # References:
 https://baseball.physics.illinois.edu/index.html
 
