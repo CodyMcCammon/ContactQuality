@@ -1,0 +1,184 @@
+ROOT
+│
+├── 1. DATA LAYER
+│   ├── 1.1 Pitch Data (Statcast)
+│   │   ├── pitch_type
+│   │   ├── release velocity vector (vx0, vy0, vz0)
+│   │   ├── spin rate
+│   │   ├── spin axis (or derivation)
+│   │   ├── movement (pfx_x, pfx_z)
+│   │   └── plate location (zone / x,y)
+│   │
+│   ├── 1.2 Hitter Profile
+│   │   ├── hitter_id
+│   │   ├── swing archetypes (pull, oppo, neutral, uppercut, level)
+│   │   ├── bat speed distribution
+│   │   ├── attack angle distribution
+│   │   ├── swing path vector (plane + direction)
+│   │   ├── timing distribution
+│   │   └── contact tendencies
+│   │       └── conditioned on (pitch_type, zone)
+│   │
+│   ├── 1.3 Conditional Interaction Model
+│   │   └── P(swing_params | hitter_id, pitch_type, zone)
+│   │       ├── bat velocity vector
+│   │       ├── attack angle
+│   │       ├── swing path orientation
+│   │       ├── contact point (x, y, z relative to plate)
+│   │       └── timing offset
+│   │
+│   ├── 1.4 Weather Data
+│   │   ├── historical weather (last 3 years, weighted)
+│   │   ├── temperature
+│   │   ├── humidity
+│   │   ├── pressure
+│   │   ├── wind speed
+│   │   └── wind direction
+│   │
+│   ├── 1.5 Stadium Data (30 parks)
+│   │   ├── field geometry (walls, stands, heights)
+│   │   ├── park orientation (azimuth)
+│   │   └── open vs closed structure characteristics
+│   │
+│   └── 1.6 Preprocessing & Mapping
+│       ├── convert all units to SI
+│       ├── reconstruct full 3D vectors (velocity, spin)
+│       ├── derive spin axis if missing
+│       ├── normalize coordinate system (field-centered)
+│       └── estimate missing parameters where required
+│
+├── 2. ENVIRONMENT MODEL
+│   ├── 2.1 Air Properties Model
+│   │   ├── compute air density (ρ) from:
+│   │   │   ├── temperature
+│   │   │   ├── humidity
+│   │   │   └── pressure
+│   │   └── optional: dynamic viscosity
+│   │
+│   ├── 2.2 Wind Field Generator (3D)
+│   │   ├── base wind distribution per stadium
+│   │   ├── vertical wind shear (velocity vs height)
+│   │   ├── spatial distortion from stadium geometry
+│   │   │   ├── wall deflection
+│   │   │   ├── stand-induced turbulence
+│   │   │   └── wake/vortex regions
+│   │   ├── stochastic sampling of wind field per simulation
+│   │   └── interpolation function:
+│   │       └── wind_vector = f(x, y, z, t)
+│   │
+│   └── 2.3 Manual Environment Override
+│       ├── user-defined wind vectors
+│       ├── user-defined humidity / temperature
+│       └── override or blend with historical distributions
+│
+├── 3. PHYSICS ENGINE
+│   ├── 3.1 Pre-Contact Ball Flight
+│   │   ├── initialize ball state:
+│   │   │   ├── position
+│   │   │   ├── velocity vector
+│   │   │   └── spin vector
+│   │   ├── forces applied:
+│   │   │   ├── gravity
+│   │   │   ├── drag force (Cd dependent on velocity regime)
+│   │   │   └── Magnus force (spin-induced lift)
+│   │   ├── incorporate local wind vector
+│   │   └── integrate using ODE solver (RK4 / RK45) until contact
+│   │
+│   ├── 3.2 Swing Resolution
+│   │   ├── inputs:
+│   │   │   ├── hitter_id
+│   │   │   ├── pitch_type
+│   │   │   ├── zone
+│   │   │   └── pitch trajectory state at contact window
+│   │   ├── sample swing parameters from:
+│   │   │   P(swing_params | hitter_id, pitch_type, zone)
+│   │   ├── resolve timing:
+│   │   │   └── adjust contact point based on timing offset
+│   │   └── outputs:
+│   │       ├── bat velocity vector
+│   │       ├── attack angle
+│   │       ├── swing plane orientation
+│   │       └── final contact point (x, y, z)
+│   │
+│   ├── 3.3 Bat-Ball Collision
+│   │   ├── compute relative velocity (bat vs ball)
+│   │   ├── apply coefficient of restitution (COR)
+│   │   ├── apply tangential compliance (frictional interaction)
+│   │   ├── compute energy transfer
+│   │   └── outputs:
+│   │       ├── exit velocity vector
+│   │       ├── launch angle
+│   │       ├── spray angle
+│   │       ├── post-impact spin rate
+│   │       └── post-impact spin axis
+│   │
+│   └── 3.4 Post-Contact Ball Flight
+│       ├── initialize with collision outputs
+│       ├── at each timestep:
+│       │   ├── sample local wind from 3D field
+│       │   ├── recompute drag force
+│       │   ├── recompute Magnus force
+│       │   └── apply gravity
+│       ├── integrate trajectory until:
+│       │   └── ball contacts ground or structure
+│       └── record full trajectory path
+│
+├── 4. SIMULATION CONTROL
+│   ├── 4.1 Scenario Definition
+│   │   ├── select hitter_id
+│   │   ├── select pitch_type
+│   │   ├── select zone
+│   │   ├── optional: fix weather conditions
+│   │   └── optional: fix swing parameters (override sampling)
+│   │
+│   ├── 4.2 Deterministic Simulation
+│   │   └── run single fully specified trajectory
+│   │
+│   ├── 4.3 Monte Carlo Simulation
+│   │   ├── repeat N simulations
+│   │   ├── per iteration sample:
+│   │   │   ├── swing parameters (conditional model)
+│   │   │   ├── wind field realization
+│   │   │   └── small stochastic contact noise
+│   │   └── store all outcomes
+│   │
+│   └── 4.4 Calibration & Validation
+│       ├── compare outputs to real Statcast outcomes
+│       ├── compute residuals (EV, LA, distance)
+│       └── tune parameters (Cd, lift coeffs, swing distributions)
+│
+├── 5. OUTPUT & VISUALIZATION
+│   ├── 5.1 Trajectory Data Output
+│   │   ├── full 3D path (x, y, z over time)
+│   │   ├── landing position
+│   │   ├── total distance
+│   │   └── hang time
+│   │
+│   ├── 5.2 Aggregated Metrics
+│   │   ├── exit velocity distribution
+│   │   ├── launch angle distribution
+│   │   ├── spray angle distribution
+│   │   ├── outcome probabilities (hit types)
+│   │   └── expected metrics (e.g., xwOBA)
+│   │
+│   ├── 5.3 Conditional Outputs
+│   │   ├── results by pitch_type
+│   │   ├── results by zone
+│   │   ├── hitter-specific spray charts
+│   │   └── EV/LA heatmaps by pitch_type × zone
+│   │
+│   ├── 5.4 3D Visualization
+│   │   ├── render trajectory spline
+│   │   ├── display spin axis (pre/post contact)
+│   │   ├── visualize wind vectors (optional)
+│   │   └── stadium geometry rendering
+│   │
+│   └── 5.5 Interface / API
+│       ├── parameter controls (weather, swing, pitch)
+│       ├── batch simulation interface
+│       └── export results (data + visuals)
+│
+└── 6. EXTENSIONS
+    ├── seam-shifted wake modeling
+    ├── turbulence modeling (Reynolds-dependent regimes)
+    └── machine learning correction layer (residual modeling)
